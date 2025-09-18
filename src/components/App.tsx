@@ -1,35 +1,147 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
-// import {} from "../types";
+import type { Prefecture, PopulationComposition } from "../types";
+import { Checkbox, FormControlLabel } from "@mui/material";
 
-export default function App() {
+export default function PrefectureCheckboxes() {
+  const [prefectures, setPrefectures] = useState<Prefecture[]>([]);
+  const [checkedCodes, setCheckedCodes] = useState<number[]>([]);
+  const [populations, setPopulations] = useState<
+    Record<number, PopulationComposition>
+  >({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const url = import.meta.env.VITE_API_BASE_URL;
   const apiKey = import.meta.env.VITE_API_KEY;
+
+  // 都道府県一覧
   useEffect(() => {
-    async function main() {
+    async function loadPrefectures() {
       try {
+        setError(null);
         const res = await fetch(`${url}/api/v1/prefectures`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "X-API-KEY": apiKey,
-          },
+          headers: { "X-API-KEY": apiKey },
         });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-        console.log("APIレスポンス:", data);
-      } catch (err) {
-        console.error("エラー:", err);
+        const json = await res.json();
+        setPrefectures(json.result || []);
+      } catch (e) {
+        setError("都道府県一覧の取得に失敗しました");
       }
     }
-    main();
-  }, []);
+    loadPrefectures();
+  }, [url, apiKey]);
+
+  // チェックの切り替え
+  function toggle(code: number) {
+    setCheckedCodes((prev) => {
+      if (prev.includes(code)) {
+        return prev.filter((c) => c !== code);
+      } else {
+        return [...prev, code];
+      }
+    });
+  }
+
+  // チェックされたら、その都道府県の人口構成を読み込む
+  useEffect(() => {
+    async function loadPopulations() {
+      const targets = checkedCodes.filter(
+        (code) => populations[code] === undefined
+      );
+      if (targets.length === 0) return;
+
+      setLoading(true);
+      setError(null);
+
+      const next: Record<number, PopulationComposition> = { ...populations };
+      try {
+        for (const code of targets) {
+          const res = await fetch(
+            // `${url}/api/v1/population/composition/perYear?cityCode=-&prefCode=${code}`,
+            `${url}/api/v1/population/composition/perYear?prefCode=${code}`,
+            { headers: { "X-API-KEY": apiKey } }
+          );
+          const json = await res.json();
+          next[code] = json.result;
+        }
+        setPopulations(next);
+        console.log("人口構成データ:", next);
+      } catch (e) {
+        setError("人口構成の取得に失敗しました");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPopulations();
+  }, [checkedCodes, url, apiKey]);
+
+  function getLatestTotal(pop: PopulationComposition): string {
+    // データがまだない場合
+    if (!pop) {
+      return "取得待ち…";
+    }
+
+    // 「総人口」のシリーズを探す
+    let series = pop.data.find((s) => s.label === "総人口");
+    if (!series) {
+      series = pop.data[0];
+    }
+
+    // シリーズ自体がないorデータが空
+    if (!series || series.data.length === 0) {
+      return "データなし";
+    }
+
+    // 最後の要素（最新年）を取り出す
+    const lastData = series.data[series.data.length - 1];
+
+    // 表示用の文字列にして返す
+    return lastData.value.toLocaleString() + "人（" + lastData.year + "年）";
+  }
 
   return (
-    <>
-      <div>ゆめみフロントエンドコーディング試験</div>
-    </>
+    <div>
+      <h3>都道府県一覧</h3>
+      <div>
+        {prefectures.map((p) => (
+          <FormControlLabel
+            key={p.prefCode}
+            control={
+              <Checkbox
+                checked={checkedCodes.includes(p.prefCode)}
+                onChange={() => toggle(p.prefCode)}
+              />
+            }
+            label={p.prefName}
+          />
+        ))}
+      </div>
+
+      <div>
+        選択されたコード:{" "}
+        {checkedCodes.length > 0 ? checkedCodes.join(", ") : "なし"}
+      </div>
+
+      {error && (
+        <div style={{ color: "crimson", marginTop: 8 }}>エラー: {error}</div>
+      )}
+      {loading && <div style={{ marginTop: 8 }}>取得中…</div>}
+
+      <div>
+        <h4>人口構成（最新年の総人口）</h4>
+        {checkedCodes.length === 0 ? (
+          <div>都道府県にチェックを入れると人口構成を取得します。</div>
+        ) : (
+          <ul>
+            {checkedCodes.map((code) => (
+              <li key={code}>
+                prefCode: {code} — {getLatestTotal(populations[code])}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
