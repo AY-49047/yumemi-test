@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ "main" ]   # デプロイしたいブランチ
+    branches: [ "main" ]
   workflow_dispatch:
 
 permissions:
@@ -21,28 +21,60 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 1) Node を 20 → ダメなら 18 に切り替え可能
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20           # ← 失敗する場合は '18' に変更して試す
           cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      # 2) ネイティブモジュール対策（node-gyp 等）
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 g++ make
 
-      # Secrets を Vite に渡す場合は任意で（リポジトリ Settings › Secrets に登録が前提）
-      # - name: Inject envs (optional)
+      # 3) ネットワーク系・peerDeps・optional等の“詰まり”を避ける設定
+      - name: NPM config hardening
+        run: |
+          npm config set fund false
+          npm config set audit false
+          npm config set legacy-peer-deps true
+          npm config set prefer-online true
+          npm config set fetch-retries 5
+          npm config set fetch-retry-maxtimeout 600000
+
+      # 4) GitHub Packages（@scope/xxx がある場合のみ）→ Secrets を事前に登録
+      #   Settings › Secrets and variables › Actions で NPM_TOKEN を用意
+      # - name: Setup .npmrc for GitHub Packages (optional)
+      #   if: ${{ secrets.NPM_TOKEN != '' }}
       #   run: |
-      #     echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> $GITHUB_ENV
-      #     echo "VITE_API_KEY=${{ secrets.VITE_API_KEY }}" >> $GITHUB_ENV
+      #     echo "//npm.pkg.github.com/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+      #     echo "@YOUR_SCOPE:registry=https://npm.pkg.github.com" >> ~/.npmrc
 
+      # 5) lockfile の有無で install を自動切替 + 再試行（2回）
+      - name: Install dependencies (with retry)
+        run: |
+          set -e
+          if [ -f package-lock.json ]; then
+            (npm ci || (echo "npm ci failed, retrying..." && rm -rf node_modules && npm ci)) 
+          else
+            (npm install || (echo "npm install failed, retrying..." && rm -rf node_modules && npm install))
+          fi
+
+      # 6) ここでビルド（環境変数が必要なら前段で $GITHUB_ENV に書き出し）
       - name: Build
         run: npm run build
+
+      - name: Verify build output
+        run: |
+          ls -la
+          ls -la dist || (echo "dist not found" && exit 1)
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist   # Vite の出力先
+          path: ./dist
 
   deploy:
     environment:
