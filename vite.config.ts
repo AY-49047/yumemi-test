@@ -4,6 +4,6 @@ import react from "@vitejs/plugin-react";
 // 例: リポジトリ名が my-react-app の場合
 export default defineConfig({
   plugins: [react()],
-  // build: { outDir: "docs" },
   base: "yumemi-test",
+  envDir: "config",
 });
