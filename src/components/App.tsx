@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import "./App.css";
-import type { Prefecture, PopulationComposition } from "../types";
+import type {
+  Prefecture,
+  PopulationComposition,
+  PrefListResponse,
+} from "../types";
 import { Checkbox, FormControlLabel } from "@mui/material";
 import * as echarts from "echarts";
 
@@ -26,7 +30,7 @@ export default function PrefectureCheckboxes() {
         const res = await fetch(`${url}/api/v1/prefectures`, {
           headers: { "X-API-KEY": apiKey },
         });
-        const json = await res.json();
+        const json: PrefListResponse = await res.json();
         setPrefectures(json.result || []);
       } catch {
         setError("都道府県一覧の取得に失敗しました");

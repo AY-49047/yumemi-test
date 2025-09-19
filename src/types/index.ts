@@ -1,7 +1,12 @@
 // 都道府県一覧
 export interface Prefecture {
-  code: number;
-  name: string;
+  prefCode: number;
+  prefName: string;
+}
+
+export interface PrefListResponse {
+  message: null | string;
+  result: Prefecture[];
 }
 
 // 人口構成
