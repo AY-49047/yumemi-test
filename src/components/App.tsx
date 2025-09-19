@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import "./App.css";
 import type { Prefecture, PopulationComposition } from "../types";
 import { Checkbox, FormControlLabel } from "@mui/material";
+import * as echarts from "echarts";
 
 export default function PrefectureCheckboxes() {
   const [prefectures, setPrefectures] = useState<Prefecture[]>([]);
@@ -11,6 +12,8 @@ export default function PrefectureCheckboxes() {
   >({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const chartRef = useRef<HTMLDivElement>(null);
 
   const url = import.meta.env.VITE_API_BASE_URL;
   const apiKey = import.meta.env.VITE_API_KEY;
@@ -25,7 +28,7 @@ export default function PrefectureCheckboxes() {
         });
         const json = await res.json();
         setPrefectures(json.result || []);
-      } catch (e) {
+      } catch {
         setError("都道府県一覧の取得に失敗しました");
       }
     }
@@ -75,6 +78,31 @@ export default function PrefectureCheckboxes() {
     }
     loadPopulations();
   }, [checkedCodes, url, apiKey]);
+
+  useEffect(() => {
+    if (chartRef.current) {
+      const chart = echarts.init(chartRef.current);
+      chart.setOption({
+        xAxis: {
+          type: "category",
+          data: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        },
+        yAxis: {
+          type: "value",
+        },
+        series: [
+          {
+            data: [150, 230, 224, 218, 135, 147, 260],
+            type: "line",
+          },
+        ],
+      });
+      // クリーンアップ
+      return () => {
+        chart.dispose();
+      };
+    }
+  }, []);
 
   function getLatestTotal(pop: PopulationComposition): string {
     // データがまだない場合
@@ -141,6 +169,11 @@ export default function PrefectureCheckboxes() {
             ))}
           </ul>
         )}
+      </div>
+      <div>
+        <h1>Hello React</h1>
+        {/* ECharts 用のコンテナ */}
+        <div ref={chartRef} style={{ width: "600px", height: "400px" }} />
       </div>
     </div>
   );
