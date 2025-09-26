@@ -213,7 +213,6 @@ export default function PrefectureCheckboxes() {
 
       <div>
         <h1>Select Graph Label</h1>
-        {/* 人口分類の切替（単一選択） */}
         <div style={{ margin: "8px 0 16px" }}>
           <RadioGroup
             row
@@ -243,8 +242,6 @@ export default function PrefectureCheckboxes() {
             />
           </RadioGroup>
         </div>
-
-        {/* ECharts 用のコンテナ（未選択時はチャートは空） */}
         <div style={{ position: "relative", width: "600px", height: "400px" }}>
           <div ref={chartRef} style={{ width: "100%", height: "100%" }} />
           {checkedCodes.length === 0 && (
